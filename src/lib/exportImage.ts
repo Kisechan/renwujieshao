@@ -1,51 +1,76 @@
-import type { Stage as KonvaStage } from 'konva/lib/Stage';
+import type Konva from 'konva';
 
-async function stageToBlob(stage: KonvaStage, pixelRatio = 2) {
-  const canvas = stage.toCanvas({ pixelRatio });
+export type ExportFormat = 'png' | 'jpeg';
 
-  return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error('PNG 导出失败，请重试。'));
-        return;
-      }
+interface ExportOptions {
+  fileName?: string;
+  pixelRatio?: number;
+}
 
-      resolve(blob);
-    }, 'image/png');
+function stageToBlob(
+  stage: Konva.Stage,
+  format: ExportFormat,
+  pixelRatio = 2,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+
+    stage.toBlob({
+      mimeType,
+      quality: format === 'jpeg' ? 0.95 : undefined,
+      pixelRatio,
+      callback(blob) {
+        if (!blob) {
+          reject(new Error('图片导出失败'));
+          return;
+        }
+
+        resolve(blob);
+      },
+    });
   });
 }
 
-export async function exportStageAsPng(
-  stage: KonvaStage,
-  filename: string,
-  pixelRatio = 2.5,
-) {
-  const blob = await stageToBlob(stage, pixelRatio);
+function triggerDownload(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = filename;
-  link.click();
-
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
   URL.revokeObjectURL(url);
 }
 
-export async function copyStageImageToClipboard(
-  stage: KonvaStage,
-  pixelRatio = 2.5,
+export async function downloadStageImage(
+  stage: Konva.Stage | null,
+  format: ExportFormat,
+  options: ExportOptions = {},
 ) {
-  if (
-    !navigator.clipboard ||
-    typeof window.ClipboardItem === 'undefined'
-  ) {
-    throw new Error('Clipboard API unavailable');
+  if (!stage) {
+    throw new Error('当前画布尚未就绪');
   }
 
-  const blob = await stageToBlob(stage, pixelRatio);
-  await navigator.clipboard.write([
-    new window.ClipboardItem({
-      'image/png': blob,
-    }),
-  ]);
+  const pixelRatio = options.pixelRatio ?? 3;
+  const blob = await stageToBlob(stage, format, pixelRatio);
+  const extension = format === 'jpeg' ? 'jpg' : 'png';
+  const fileName = options.fileName ?? `meme-export.${extension}`;
+
+  triggerDownload(blob, fileName);
 }
+
+export async function copyStageToClipboard(stage: Konva.Stage | null, pixelRatio = 3) {
+  if (!stage) {
+    throw new Error('当前画布尚未就绪');
+  }
+
+  if (!window.ClipboardItem || !navigator.clipboard?.write) {
+    throw new Error('当前浏览器不支持复制图片到剪贴板');
+  }
+
+  const blob = await stageToBlob(stage, 'png', pixelRatio);
+  const clipboardItem = new window.ClipboardItem({
+    'image/png': blob,
+  });
+
+  await navigator.clipboard.write([clipboardItem]);
+}
+

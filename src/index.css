@@ -1,31 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  font-family:
-    "IBM Plex Sans",
-    "PingFang SC",
-    "Hiragino Sans GB",
-    "Microsoft YaHei",
-    sans-serif;
-  color: #161411;
-  background: #ece7dc;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --ink: #111111;
+  --line: #d4d4d4;
+  --soft: #f5f5f5;
+  --muted: #666666;
+  color: var(--ink);
 }
 
 * {
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 body {
   margin: 0;
-  min-width: 320px;
+  background: #ffffff;
+  color: var(--ink);
 }
 
 button,
@@ -39,11 +35,117 @@ button {
   cursor: pointer;
 }
 
-img {
-  display: block;
-  max-width: 100%;
+input[type='range'] {
+  accent-color: #111111;
 }
 
-#root {
+summary {
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-shell {
   min-height: 100vh;
+  padding: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.control {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  padding: 10px 12px;
+  color: var(--ink);
+}
+
+.control:focus {
+  outline: none;
+  border-color: #111111;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #111111;
+  background: #ffffff;
+  color: #111111;
+  padding: 10px 14px;
+  font-weight: 600;
+}
+
+.btn:hover {
+  background: #f5f5f5;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-primary {
+  background: #111111;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: #333333;
+}
+
+.btn-secondary {
+  background: #ffffff;
+  color: #111111;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.section-block {
+  border-top: 1px solid var(--line);
+}
+
+.section-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.plain-note {
+  border: 1px solid var(--line);
+  background: #ffffff;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.preview-grid {
+  background:
+    linear-gradient(#ececec 1px, transparent 1px),
+    linear-gradient(90deg, #ececec 1px, transparent 1px);
+  background-size: 16px 16px;
+  background-color: #fafafa;
 }

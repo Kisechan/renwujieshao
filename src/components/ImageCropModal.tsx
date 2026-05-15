@@ -1,179 +1,175 @@
-import { useState } from 'react';
-import Cropper, { type Area } from 'react-easy-crop';
+import { useEffect, useState } from 'react';
+import Cropper from 'react-easy-crop';
+import 'react-easy-crop/react-easy-crop.css';
 import { getCroppedImage } from '../lib/cropImage';
-import type { CropResult, RoleItem } from '../types';
 
-type ImageCropModalProps = {
+interface ImageCropModalProps {
+  imageSrc: string | null;
   isOpen: boolean;
-  role: RoleItem | null;
-  source: string | null;
-  onClose: () => void;
-  onConfirm: (result: CropResult) => void;
-  onError: (message: string) => void;
-};
+  roleLabel: string;
+  onCancel: () => void;
+  onConfirm: (croppedImage: string) => void;
+}
 
-type CropSessionProps = Omit<ImageCropModalProps, 'isOpen'> & {
-  role: RoleItem;
-  source: string;
-};
-
-function CropSession({
-  role,
-  source,
-  onClose,
+export default function ImageCropModal({
+  imageSrc,
+  isOpen,
+  roleLabel,
+  onCancel,
   onConfirm,
-  onError,
-}: CropSessionProps) {
-  const [crop, setCrop] = useState(() => role.cropState.crop);
-  const [zoom, setZoom] = useState(() => role.cropState.zoom);
-  const [rotation, setRotation] = useState(() => role.cropState.rotation);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+}: ImageCropModalProps) {
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<{
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleConfirm = async () => {
-    if (!croppedAreaPixels) {
-      onError('请先调整图片裁剪区域。');
+  useEffect(() => {
+    if (!isOpen || !imageSrc) {
       return;
     }
 
-    setSubmitting(true);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setRotation(0);
+    setCroppedAreaPixels(null);
+    setError(null);
+    setIsSaving(false);
+  }, [imageSrc, isOpen]);
+
+  if (!isOpen || !imageSrc) {
+    return null;
+  }
+
+  async function handleConfirm() {
+    if (!croppedAreaPixels) {
+      setError('请先调整裁剪区域');
+      return;
+    }
+
+    if (!imageSrc) {
+      setError('缺少待裁剪图片');
+      return;
+    }
+
+    setError(null);
+    setIsSaving(true);
 
     try {
-      const imageSrc = await getCroppedImage(source, croppedAreaPixels, rotation);
-      onConfirm({
-        imageSrc,
-        cropState: {
-          crop,
-          zoom,
-          rotation,
-        },
-      });
-    } catch {
-      onError('图片裁剪失败，请尝试重新上传。');
+      const croppedImage = await getCroppedImage(imageSrc, croppedAreaPixels, rotation);
+      onConfirm(croppedImage);
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setRotation(0);
+      setCroppedAreaPixels(null);
+    } catch (cropError) {
+      setError(cropError instanceof Error ? cropError.message : '图片裁剪失败');
     } finally {
-      setSubmitting(false);
+      setIsSaving(false);
     }
-  };
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/70 px-4 py-6 backdrop-blur-sm">
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[30px] border border-stone-300 bg-[#f9f7f1] shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-        <div className="flex items-start justify-between gap-4 border-b border-stone-200 px-5 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4 py-6">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden border border-black bg-white">
+        <div className="flex items-start justify-between gap-4 border-b border-black px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-stone-500">
-              Crop Image
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold text-stone-950">
-              {role.title || '角色图片'} 裁剪
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              拖拽图片调整位置，使用缩放和旋转微调，确认后会应用到当前角色卡片。
-            </p>
+            <div className="section-title">图片裁剪</div>
+            <h2 className="mt-2 text-2xl font-bold text-neutral-900">调整 {roleLabel} 的展示区域</h2>
+            <p className="mt-1 text-sm text-neutral-600">支持拖拽、缩放和旋转，确认后会应用到当前角色。</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-800"
-          >
+          <button className="btn btn-secondary" onClick={onCancel} type="button">
             关闭
           </button>
         </div>
 
-        <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="relative min-h-[420px] overflow-hidden rounded-[24px] border border-stone-300 bg-stone-950">
+        <div className="grid flex-1 gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="relative min-h-[360px] bg-neutral-950">
             <Cropper
-              image={source}
+              image={imageSrc}
               crop={crop}
               zoom={zoom}
               rotation={rotation}
               aspect={1}
-              cropShape={role.shape === 'circle' ? 'round' : 'rect'}
-              showGrid={false}
               objectFit="contain"
               onCropChange={setCrop}
               onZoomChange={setZoom}
               onRotationChange={setRotation}
-              onCropComplete={(_, croppedArea) => setCroppedAreaPixels(croppedArea)}
+              onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
             />
           </div>
 
-          <div className="space-y-5 rounded-[24px] border border-stone-300 bg-white p-4">
-            <label className="flex flex-col gap-2 text-sm font-medium text-stone-700">
-              <span>缩放</span>
+          <div className="flex flex-col gap-6 border-t border-black px-6 py-5 lg:border-l lg:border-t-0">
+            <div className="field">
+              <label className="field-label" htmlFor="crop-zoom">
+                缩放
+              </label>
               <input
-                type="range"
-                min={1}
+                className="w-full"
+                id="crop-zoom"
                 max={3}
-                step={0.01}
-                value={zoom}
+                min={1}
                 onChange={(event) => setZoom(Number(event.target.value))}
-              />
-              <span className="text-xs text-stone-500">{zoom.toFixed(2)}x</span>
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-medium text-stone-700">
-              <span>旋转</span>
-              <input
+                step={0.01}
                 type="range"
-                min={0}
-                max={360}
-                step={1}
-                value={rotation}
-                onChange={(event) => setRotation(Number(event.target.value))}
+                value={zoom}
               />
-              <span className="text-xs text-stone-500">{rotation}°</span>
-            </label>
-
-            <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
-              建议使用接近正方形的人像素材。最终会按当前角色的形状裁切显示，并支持在图片上叠加标题。
+              <div className="field-hint">{zoom.toFixed(2)}x</div>
             </div>
 
-            <div className="grid gap-3">
+            <div className="field">
+              <label className="field-label" htmlFor="crop-rotation">
+                旋转
+              </label>
+              <input
+                className="w-full"
+                id="crop-rotation"
+                max={180}
+                min={-180}
+                onChange={(event) => setRotation(Number(event.target.value))}
+                step={1}
+                type="range"
+                value={rotation}
+              />
+              <div className="field-hint">{rotation}°</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setCrop({ x: 0, y: 0 });
+                  setZoom(1);
+                  setRotation(0);
+                }}
                 type="button"
+              >
+                重置
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={isSaving}
                 onClick={handleConfirm}
-                disabled={submitting}
-                className="rounded-2xl bg-stone-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-800 disabled:cursor-wait disabled:bg-stone-400"
-              >
-                {submitting ? '应用中...' : '确认裁剪'}
-              </button>
-              <button
                 type="button"
-                onClick={onClose}
-                className="rounded-2xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800 transition hover:bg-stone-200"
               >
-                取消
+                {isSaving ? '应用中...' : '应用裁剪'}
               </button>
             </div>
+
+            {error ? (
+              <div className="border border-red-300 bg-white px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-function ImageCropModal({
-  isOpen,
-  role,
-  source,
-  onClose,
-  onConfirm,
-  onError,
-}: ImageCropModalProps) {
-  if (!isOpen || !role || !source) {
-    return null;
-  }
-
-  return (
-    <CropSession
-      key={`${role.id}-${source}`}
-      role={role}
-      source={source}
-      onClose={onClose}
-      onConfirm={onConfirm}
-      onError={onError}
-    />
-  );
-}
-
-export default ImageCropModal;

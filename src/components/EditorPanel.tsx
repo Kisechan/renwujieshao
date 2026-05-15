@@ -1,343 +1,307 @@
-import type { ChangeEvent, ReactNode } from 'react';
-import RoleEditor from './RoleEditor';
-import { TITLE_FONT_OPTIONS } from '../lib/defaultTemplate';
+import type { ReactNode } from 'react';
 import type { MemeConfig, RoleItem } from '../types';
+import RoleEditor from './RoleEditor';
 
-type EditorPanelProps = {
+interface EditorPanelProps {
   config: MemeConfig;
-  feedback: {
-    kind: 'success' | 'error';
-    message: string;
-  } | null;
-  onTitleChange: (value: string) => void;
-  onSettingsChange: (patch: Partial<MemeConfig['settings']>) => void;
-  onRoleChange: (roleId: string, patch: Partial<RoleItem>) => void;
-  onRoleImageUpload: (
-    roleId: string,
-    event: ChangeEvent<HTMLInputElement>,
-  ) => void;
-  onRoleRecrop: (roleId: string) => void;
-  onRoleRemoveImage: (roleId: string) => void;
-  onRestoreDefaults: () => void;
-  onExport: () => void;
+  busyAction: string | null;
+  notice: { type: 'error' | 'success'; message: string } | null;
+  onConfigChange: (next: MemeConfig) => void;
+  onReset: () => void;
+  onExportPng: () => void;
+  onExportJpg: () => void;
   onCopy: () => void;
-};
+  onSelectRoleImage: (roleId: string, file: File) => void;
+  onRecropRoleImage: (roleId: string) => void;
+}
 
-function Field({
-  label,
-  children,
-}: {
+interface RangeFieldProps {
+  id: string;
   label: string;
-  children: ReactNode;
-}) {
+  min: number;
+  max: number;
+  step?: number;
+  suffix?: string;
+  value: number;
+  onChange: (value: number) => void;
+}
+
+function RangeField({ id, label, min, max, step = 1, suffix = '', value, onChange }: RangeFieldProps) {
   return (
-    <label className="flex flex-col gap-2 text-sm font-medium text-stone-700">
-      <span>{label}</span>
-      {children}
-    </label>
+    <div className="field">
+      <label className="field-label" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        className="w-full"
+        id={id}
+        max={max}
+        min={min}
+        onChange={(event) => onChange(Number(event.target.value))}
+        step={step}
+        type="range"
+        value={value}
+      />
+      <div className="field-hint">
+        {value}
+        {suffix}
+      </div>
+    </div>
   );
 }
 
-function inputClassName() {
-  return 'w-full rounded-2xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none transition focus:border-stone-900 focus:ring-2 focus:ring-stone-300';
+function Section({
+  title,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className="section-block" open={defaultOpen}>
+      <summary className="section-toggle">
+        <span>{title}</span>
+        <span className="text-xs font-normal text-neutral-500">展开 / 折叠</span>
+      </summary>
+      <div className="grid gap-4 pb-4">{children}</div>
+    </details>
+  );
 }
 
-function EditorPanel({
+export default function EditorPanel({
   config,
-  feedback,
-  onTitleChange,
-  onSettingsChange,
-  onRoleChange,
-  onRoleImageUpload,
-  onRoleRecrop,
-  onRoleRemoveImage,
-  onRestoreDefaults,
-  onExport,
+  busyAction,
+  notice,
+  onConfigChange,
+  onReset,
+  onExportPng,
+  onExportJpg,
   onCopy,
+  onSelectRoleImage,
+  onRecropRoleImage,
 }: EditorPanelProps) {
+  const { settings } = config;
+
+  function updateRole(roleId: string, patch: Partial<RoleItem>) {
+    onConfigChange({
+      ...config,
+      roles: config.roles.map((role) => (role.id === roleId ? { ...role, ...patch } : role)),
+    });
+  }
+
+  function updateSettings<K extends keyof MemeConfig['settings']>(key: K, value: MemeConfig['settings'][K]) {
+    onConfigChange({
+      ...config,
+      settings: {
+        ...settings,
+        [key]: value,
+      },
+    });
+  }
+
   return (
-    <aside className="flex min-h-0 flex-col gap-4 rounded-[32px] border border-stone-300/80 bg-[#fbfaf6]/92 p-4 shadow-[0_18px_50px_rgba(30,20,10,0.08)] backdrop-blur md:p-5">
-      <div className="space-y-4">
-        <div className="rounded-[26px] border border-stone-300 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-stone-500">
-            Actions
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={onExport}
-              className="rounded-2xl bg-stone-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-stone-800"
-            >
-              导出 PNG
-            </button>
-            <button
-              type="button"
-              onClick={onCopy}
-              className="rounded-2xl border border-stone-400 bg-white px-4 py-3 text-sm font-semibold text-stone-900 transition hover:border-stone-950"
-            >
-              复制图片到剪贴板
-            </button>
-            <button
-              type="button"
-              onClick={onRestoreDefaults}
-              className="rounded-2xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-800 transition hover:bg-stone-200 sm:col-span-2"
-            >
-              恢复默认模板
-            </button>
-          </div>
-
-          {feedback ? (
-            <div
-              className={`mt-4 rounded-2xl px-4 py-3 text-sm leading-6 ${
-                feedback.kind === 'success'
-                  ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
-                  : 'border border-rose-200 bg-rose-50 text-rose-700'
-              }`}
-            >
-              {feedback.message}
-            </div>
-          ) : null}
-
-          <p className="mt-4 text-xs leading-5 text-stone-500">
-            草稿会自动保存在当前浏览器的 localStorage 中。
-          </p>
+    <aside className="border border-black bg-white">
+      <div className="flex items-start justify-between gap-4 border-b border-black px-4 py-4">
+        <div>
+          <div className="section-title">编辑器</div>
+          <h1 className="mt-1 text-2xl font-bold">登场人物介绍 Meme</h1>
+          <p className="mt-1 text-sm text-neutral-700">左侧调整内容与样式，右侧画布实时更新。</p>
         </div>
-
-        <div className="rounded-[26px] border border-stone-300 bg-white p-4">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-stone-500">
-                Global
-              </p>
-              <h2 className="mt-2 text-xl font-semibold text-stone-950">
-                整体样式设置
-              </h2>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4">
-            <Field label="顶部标题">
-              <input
-                className={inputClassName()}
-                value={config.title}
-                onChange={(event) => onTitleChange(event.target.value)}
-              />
-            </Field>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="画布宽度">
-                <input
-                  type="number"
-                  min={720}
-                  max={2160}
-                  step={10}
-                  className={inputClassName()}
-                  value={config.settings.canvasWidth}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      canvasWidth: Number(event.target.value) || 1080,
-                    })
-                  }
-                />
-              </Field>
-              <Field label="画布高度">
-                <input
-                  type="number"
-                  min={720}
-                  max={2160}
-                  step={10}
-                  className={inputClassName()}
-                  value={config.settings.canvasHeight}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      canvasHeight: Number(event.target.value) || 1080,
-                    })
-                  }
-                />
-              </Field>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="背景色">
-                <input
-                  type="color"
-                  className="h-12 w-full cursor-pointer rounded-2xl border border-stone-300 bg-white p-2"
-                  value={config.settings.backgroundColor}
-                  onChange={(event) =>
-                    onSettingsChange({ backgroundColor: event.target.value })
-                  }
-                />
-              </Field>
-              <Field label="全局文字颜色">
-                <input
-                  type="color"
-                  className="h-12 w-full cursor-pointer rounded-2xl border border-stone-300 bg-white p-2"
-                  value={config.settings.globalTextColor}
-                  onChange={(event) =>
-                    onSettingsChange({ globalTextColor: event.target.value })
-                  }
-                />
-              </Field>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="标题字号">
-                <input
-                  type="number"
-                  min={32}
-                  max={160}
-                  className={inputClassName()}
-                  value={config.settings.titleFontSize}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      titleFontSize: Number(event.target.value) || 78,
-                    })
-                  }
-                />
-              </Field>
-              <Field label="标题字体">
-                <select
-                  className={inputClassName()}
-                  value={config.settings.titleFontFamily}
-                  onChange={(event) =>
-                    onSettingsChange({ titleFontFamily: event.target.value })
-                  }
-                >
-                  {TITLE_FONT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="横线颜色">
-                <input
-                  type="color"
-                  className="h-12 w-full cursor-pointer rounded-2xl border border-stone-300 bg-white p-2"
-                  value={config.settings.lineColor}
-                  onChange={(event) =>
-                    onSettingsChange({ lineColor: event.target.value })
-                  }
-                />
-              </Field>
-              <Field label="横线粗细">
-                <input
-                  type="number"
-                  min={1}
-                  max={24}
-                  className={inputClassName()}
-                  value={config.settings.lineThickness}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      lineThickness: Number(event.target.value) || 6,
-                    })
-                  }
-                />
-              </Field>
-              <Field label="横线左右边距">
-                <input
-                  type="number"
-                  min={30}
-                  max={320}
-                  className={inputClassName()}
-                  value={config.settings.lineMarginX}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      lineMarginX: Number(event.target.value) || 132,
-                    })
-                  }
-                />
-              </Field>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="角色边框颜色">
-                <input
-                  type="color"
-                  className="h-12 w-full cursor-pointer rounded-2xl border border-stone-300 bg-white p-2"
-                  value={config.settings.roleBorderColor}
-                  onChange={(event) =>
-                    onSettingsChange({ roleBorderColor: event.target.value })
-                  }
-                />
-              </Field>
-              <Field label="角色边框宽度">
-                <input
-                  type="number"
-                  min={1}
-                  max={24}
-                  className={inputClassName()}
-                  value={config.settings.roleBorderWidth}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      roleBorderWidth: Number(event.target.value) || 6,
-                    })
-                  }
-                />
-              </Field>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="角色框大小">
-                <input
-                  type="number"
-                  min={180}
-                  max={480}
-                  className={inputClassName()}
-                  value={config.settings.roleSize}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      roleSize: Number(event.target.value) || 288,
-                    })
-                  }
-                />
-              </Field>
-              <Field label="四宫格间距">
-                <input
-                  type="number"
-                  min={20}
-                  max={180}
-                  className={inputClassName()}
-                  value={config.settings.gridGap}
-                  onChange={(event) =>
-                    onSettingsChange({
-                      gridGap: Number(event.target.value) || 88,
-                    })
-                  }
-                />
-              </Field>
-            </div>
-          </div>
-        </div>
+        <button className="btn btn-secondary shrink-0" onClick={onReset} type="button">
+          恢复默认
+        </button>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-stone-500">
-            Roles
-          </p>
-          <h2 className="mt-2 text-xl font-semibold text-stone-950">
-            四个角色卡片
-          </h2>
-        </div>
+      <div className="px-4 py-2">
+        <Section title="导出" defaultOpen>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              className="btn btn-primary"
+              disabled={busyAction !== null}
+              onClick={onExportPng}
+              type="button"
+            >
+              {busyAction === 'png' ? '导出中...' : '导出 PNG'}
+            </button>
+            <button
+              className="btn btn-secondary"
+              disabled={busyAction !== null}
+              onClick={onExportJpg}
+              type="button"
+            >
+              {busyAction === 'jpg' ? '导出中...' : '导出 JPG'}
+            </button>
+          </div>
+          <button className="btn btn-secondary" disabled={busyAction !== null} onClick={onCopy} type="button">
+            {busyAction === 'copy' ? '复制中...' : '复制图片到剪贴板'}
+          </button>
+          <div
+            className={`plain-note ${notice?.type === 'error' ? 'border-red-400 text-red-700' : notice?.type === 'success' ? 'border-green-500 text-green-700' : ''}`}
+          >
+            {notice?.message ?? '浏览器不支持图片剪贴板时，建议直接使用下载按钮保存。'}
+          </div>
+        </Section>
 
-        {config.roles.map((role, index) => (
-          <RoleEditor
-            key={role.id}
-            role={role}
-            index={index}
-            onChange={(patch) => onRoleChange(role.id, patch)}
-            onImageUpload={(event) => onRoleImageUpload(role.id, event)}
-            onRecrop={() => onRoleRecrop(role.id)}
-            onRemoveImage={() => onRoleRemoveImage(role.id)}
-          />
-        ))}
+        <Section title="基础内容" defaultOpen>
+          <div className="field">
+            <label className="field-label" htmlFor="meme-title">
+              顶部标题
+            </label>
+            <input
+              className="control"
+              id="meme-title"
+              maxLength={28}
+              onChange={(event) => onConfigChange({ ...config, title: event.target.value })}
+              placeholder="输入标题"
+              type="text"
+              value={config.title}
+            />
+          </div>
+        </Section>
+
+        <Section title="整体样式" defaultOpen>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="field">
+              <label className="field-label" htmlFor="background-color">
+                背景色
+              </label>
+              <div className="flex gap-2">
+                <input
+                  className="h-10 w-14 border border-black bg-transparent"
+                  id="background-color"
+                  onChange={(event) => updateSettings('backgroundColor', event.target.value)}
+                  type="color"
+                  value={settings.backgroundColor}
+                />
+                <input
+                  className="control"
+                  onChange={(event) => updateSettings('backgroundColor', event.target.value)}
+                  type="text"
+                  value={settings.backgroundColor}
+                />
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="field-label" htmlFor="text-color">
+                全局文字颜色
+              </label>
+              <div className="flex gap-2">
+                <input
+                  className="h-10 w-14 border border-black bg-transparent"
+                  id="text-color"
+                  onChange={(event) => updateSettings('textColor', event.target.value)}
+                  type="color"
+                  value={settings.textColor}
+                />
+                <input
+                  className="control"
+                  onChange={(event) => updateSettings('textColor', event.target.value)}
+                  type="text"
+                  value={settings.textColor}
+                />
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="field-label" htmlFor="border-color">
+                角色框线颜色
+              </label>
+              <div className="flex gap-2">
+                <input
+                  className="h-10 w-14 border border-black bg-transparent"
+                  id="border-color"
+                  onChange={(event) => updateSettings('borderColor', event.target.value)}
+                  type="color"
+                  value={settings.borderColor}
+                />
+                <input
+                  className="control"
+                  onChange={(event) => updateSettings('borderColor', event.target.value)}
+                  type="text"
+                  value={settings.borderColor}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <RangeField
+              id="title-font-size"
+              label="标题字号"
+              max={104}
+              min={32}
+              onChange={(value) => updateSettings('titleFontSize', value)}
+              value={settings.titleFontSize}
+            />
+            <RangeField
+              id="role-title-font-size"
+              label="角色标题字号"
+              max={88}
+              min={20}
+              onChange={(value) => updateSettings('roleTitleFontSize', value)}
+              value={settings.roleTitleFontSize}
+            />
+            <RangeField
+              id="description-font-size"
+              label="简介字号"
+              max={52}
+              min={16}
+              onChange={(value) => updateSettings('descriptionFontSize', value)}
+              value={settings.descriptionFontSize}
+            />
+            <RangeField
+              id="border-width"
+              label="角色框线宽度"
+              max={16}
+              min={1}
+              onChange={(value) => updateSettings('borderWidth', value)}
+              value={settings.borderWidth}
+            />
+            <RangeField
+              id="role-size"
+              label="角色框大小"
+              max={360}
+              min={160}
+              onChange={(value) => updateSettings('roleSize', value)}
+              suffix="px"
+              value={settings.roleSize}
+            />
+            <RangeField
+              id="grid-gap"
+              label="四宫格间距"
+              max={120}
+              min={20}
+              onChange={(value) => updateSettings('gridGap', value)}
+              suffix="px"
+              value={settings.gridGap}
+            />
+          </div>
+        </Section>
+
+        <Section title="角色内容" defaultOpen>
+          <div className="grid gap-0 border-t border-black">
+            {config.roles.map((role, index) => (
+              <RoleEditor
+                index={index}
+                key={role.id}
+                onChange={(patch) => updateRole(role.id, patch)}
+                onRecrop={() => onRecropRoleImage(role.id)}
+                onRemoveImage={() =>
+                  updateRole(role.id, {
+                    imageSrc: null,
+                    originalImageSrc: null,
+                  })
+                }
+                onSelectImage={(file) => onSelectRoleImage(role.id, file)}
+                role={role}
+              />
+            ))}
+          </div>
+        </Section>
       </div>
     </aside>
   );
 }
-
-export default EditorPanel;

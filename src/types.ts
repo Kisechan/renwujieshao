@@ -1,57 +1,40 @@
-export type DisplayType = 'text' | 'image';
-export type ShapeType = 'circle' | 'square' | 'rounded';
+export type RoleDisplayType = 'text' | 'image';
+export type RoleShape = 'circle' | 'square' | 'rounded';
 
-export type CropState = {
-  crop: {
-    x: number;
-    y: number;
-  };
-  zoom: number;
-  rotation: number;
-};
-
-export type RoleItem = {
+export interface RoleItem {
   id: string;
   title: string;
   description: string;
-  displayType: DisplayType;
-  shape: ShapeType;
-  titleFontSize: number;
-  titleFontWeight: number;
-  titleColor: string;
-  descriptionFontSize: number;
-  descriptionColor: string;
-  descriptionWrap: boolean;
-  overlayTitleOnImage: boolean;
+  displayType: RoleDisplayType;
+  shape: RoleShape;
   imageSrc: string | null;
   originalImageSrc: string | null;
-  cropState: CropState;
-};
+  showTitleOverlay: boolean;
+}
 
-export type CanvasSettings = {
-  canvasWidth: number;
-  canvasHeight: number;
+export interface CanvasSettings {
   backgroundColor: string;
-  titleFontSize: number;
-  titleFontWeight: number;
-  titleFontFamily: string;
-  globalTextColor: string;
-  lineColor: string;
-  lineThickness: number;
-  lineMarginX: number;
-  roleBorderColor: string;
-  roleBorderWidth: number;
+  textColor: string;
+  borderColor: string;
+  borderWidth: number;
   roleSize: number;
   gridGap: number;
-};
+  canvasPadding: number;
+  titleGap: number;
+  titleFontSize: number;
+  titleFontFamily: string;
+  roleTitleFontSize: number;
+  descriptionFontSize: number;
+  bodyFontFamily: string;
+}
 
-export type MemeConfig = {
+export interface MemeConfig {
   title: string;
-  settings: CanvasSettings;
   roles: RoleItem[];
-};
+  settings: CanvasSettings;
+}
 
-export type CropResult = {
+export interface CropResult {
   imageSrc: string;
-  cropState: CropState;
-};
+}
+

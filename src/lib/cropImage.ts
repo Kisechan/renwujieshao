@@ -1,50 +1,42 @@
-import type { Area } from 'react-easy-crop';
+const TO_RADIANS = Math.PI / 180;
 
-function createImage(source: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new window.Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('Image load failed'));
-    image.src = source;
+function createImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener('load', () => resolve(image));
+    image.addEventListener('error', () => reject(new Error('图片加载失败')));
+    image.setAttribute('crossOrigin', 'anonymous');
+    image.src = src;
   });
 }
 
-function getRadianAngle(degreeValue: number) {
-  return (degreeValue * Math.PI) / 180;
-}
-
 function rotateSize(width: number, height: number, rotation: number) {
-  const radians = getRadianAngle(rotation);
+  const rotRad = rotation * TO_RADIANS;
   return {
-    width:
-      Math.abs(Math.cos(radians) * width) +
-      Math.abs(Math.sin(radians) * height),
-    height:
-      Math.abs(Math.sin(radians) * width) +
-      Math.abs(Math.cos(radians) * height),
+    width: Math.abs(Math.cos(rotRad) * width) + Math.abs(Math.sin(rotRad) * height),
+    height: Math.abs(Math.sin(rotRad) * width) + Math.abs(Math.cos(rotRad) * height),
   };
 }
 
 export async function getCroppedImage(
-  source: string,
-  pixelCrop: Area,
+  imageSrc: string,
+  pixelCrop: { width: number; height: number; x: number; y: number },
   rotation = 0,
-) {
-  const image = await createImage(source);
-  const radians = getRadianAngle(rotation);
-  const boundingBox = rotateSize(image.width, image.height, rotation);
+): Promise<string> {
+  const image = await createImage(imageSrc);
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
 
   if (!context) {
-    throw new Error('Canvas context unavailable');
+    throw new Error('浏览器不支持 Canvas');
   }
 
-  canvas.width = boundingBox.width;
-  canvas.height = boundingBox.height;
+  const safeArea = rotateSize(image.width, image.height, rotation);
+  canvas.width = safeArea.width;
+  canvas.height = safeArea.height;
 
-  context.translate(boundingBox.width / 2, boundingBox.height / 2);
-  context.rotate(radians);
+  context.translate(safeArea.width / 2, safeArea.height / 2);
+  context.rotate(rotation * TO_RADIANS);
   context.translate(-image.width / 2, -image.height / 2);
   context.drawImage(image, 0, 0);
 
@@ -52,7 +44,7 @@ export async function getCroppedImage(
   const croppedContext = croppedCanvas.getContext('2d');
 
   if (!croppedContext) {
-    throw new Error('Canvas context unavailable');
+    throw new Error('浏览器不支持裁剪');
   }
 
   croppedCanvas.width = pixelCrop.width;
@@ -72,3 +64,4 @@ export async function getCroppedImage(
 
   return croppedCanvas.toDataURL('image/png');
 }
+
